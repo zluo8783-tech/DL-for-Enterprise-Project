@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wildfire-clf
+  labels:
+    app: wildfire-clf
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: wildfire-clf
+
+  template:
+    metadata:
+      labels:
+        app: wildfire-clf
+
+    spec:
+      containers:
+        - name: wildfire-clf
+          image: wildfire-clf:latest
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - containerPort: 8000
+
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"

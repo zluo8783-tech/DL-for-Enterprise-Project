@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Wildfire AI Dashboard</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .dropzone {
+      border: 2px dashed #38bdf8;
+      padding: 40px;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+
+    .dropzone.dragover {
+      background: #1e293b;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 30px;
+      border-collapse: collapse;
+      background: #111827;
+    }
+
+    th, td {
+      border: 1px solid #334155;
+      padding: 10px;
+    }
+
+    th {
+      background: #1e293b;
+    }
+
+    .preview {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .card {
+      background: #1e293b;
+      padding: 10px;
+      border-radius: 10px;
+    }
+
+    .card img {
+      width: 100%;
+      border-radius: 8px;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background: #38bdf8;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: auto;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>🔥 Wildfire AI Dashboard</h1>
+
+  <div id="dropzone" class="dropzone">
+    Drag & Drop Images or Click
+    <input type="file" id="fileInput" multiple hidden />
+  </div>
+
+  <div class="preview" id="preview"></div>
+
+  <button onclick="upload()">Run Inference</button>
+
+  <table>
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>ResNet</th>
+        <th>ResMLP</th>
+        <th>ViT</th>
+      </tr>
+    </thead>
+    <tbody id="resultsTable"></tbody>
+  </table>
+
+</div>
+
+<script>
+
+let files = [];
+
+const dropzone = document.getElementById("dropzone");
+const fileInput = document.getElementById("fileInput");
+const preview = document.getElementById("preview");
+const table = document.getElementById("resultsTable");
+
+// open file picker
+dropzone.onclick = () => fileInput.click();
+
+// drag events
+dropzone.ondragover = e => {
+  e.preventDefault();
+  dropzone.classList.add("dragover");
+};
+
+dropzone.ondragleave = () => {
+  dropzone.classList.remove("dragover");
+};
+
+dropzone.ondrop = e => {
+  e.preventDefault();
+  dropzone.classList.remove("dragover");
+  handleFiles(e.dataTransfer.files);
+};
+
+fileInput.onchange = e => {
+  handleFiles(e.target.files);
+};
+
+function handleFiles(selected) {
+  files = [...selected];
+  preview.innerHTML = "";
+  table.innerHTML = "";
+
+  files.forEach(file => {
+    const reader = new FileReader();
+
+    reader.onload = e => {
+      preview.innerHTML += `
+        <div class="card">
+          <img src="${e.target.result}" />
+          <p>${file.name}</p>
+        </div>
+      `;
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+// upload
+async function upload() {
+  const formData = new FormData();
+
+  files.forEach(f => {
+    formData.append("files", f);
+  });
+
+  const res = await fetch("http://127.0.0.1:8000/predict", {
+    method: "POST",
+    body: formData
+  });
+
+  const data = await res.json();
+  renderTable(data.results);
+}
+
+// render grouped table
+function renderTable(data) {
+  table.innerHTML = "";
+
+  for (const file in data) {
+    const m = data[file];
+
+    table.innerHTML += `
+      <tr>
+        <td>${file}</td>
+
+        <td>
+          ${m.resnet.prediction}<br>
+          ${(m.resnet.confidence * 100).toFixed(1)}%
+        </td>
+
+        <td>
+          ${m.resmlp.prediction}<br>
+          ${(m.resmlp.confidence * 100).toFixed(1)}%
+        </td>
+
+        <td>
+          ${m.vit.prediction}<br>
+          ${(m.vit.confidence * 100).toFixed(1)}%
+        </td>
+      </tr>
+    `;
+  }
+}
+
+</script>
+
+</body>
+</html>
