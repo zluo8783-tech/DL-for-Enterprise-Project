@@ -62,6 +62,24 @@ wildfire/
 
 ---
 
+## 📥 Pre-trained Model
+Due to GitHub's file size limits, the PyTorch model (`.pth`) is hosted externally.
+
+**Download Link:** [Download the three .pth files from Google Drive](https://drive.google.com/drive/u/0/folders/15l3wPMP6yRpR5Ft5k2_i1mIgQeS1UBU2)
+
+Place the downloaded file in the `wildfire_clf/app/weights/` directory:
+
+## 📂 Repository Structure
+```text
+wildfire_clf/
+├── app/
+    ├── weights/          
+        ├── resnet.pth      
+        ├── resmlp.pth     
+        └── vit.pth  
+
+---
+
 ## Usage
 
 Run each notebook end-to-end. Each notebook executes the following steps automatically:

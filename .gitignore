@@ -1,0 +1,3 @@
+#Note: The `models/*.pth` files are excluded from this repository via `.gitignore`.
+
+*.pth
