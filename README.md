@@ -62,14 +62,13 @@ wildfire/
 
 ---
 
-## 📥 Pre-trained Model
+## Pre-trained Model
 Due to GitHub's file size limits, the PyTorch model (`.pth`) is hosted externally.
 
 **Download Link:** [Download the three .pth files from Google Drive](https://drive.google.com/drive/u/0/folders/15l3wPMP6yRpR5Ft5k2_i1mIgQeS1UBU2)
 
 Place the downloaded file in the `wildfire_clf/app/weights/` directory:
 
-## 📂 Repository Structure
 ```text
 wildfire_clf/
 └── app/
@@ -115,4 +114,41 @@ Each notebook saves the following files to its `OUT_DIR`:
 | `test_report_<name>.json` | Full per-class metrics in JSON format |
 | `test_report_table_<name>.csv` | Per-class metrics as a CSV table |
 
+---
 
+## Deployment
+
+1. Run Locally 
+
+```bash
+py -m venv .venv
+.venv\scripts\activate
+pip install -r requirements.txt
+
+# start api
+uvicorn main:app --host 0.0.0.0 --port 8000 # http://localhost:8000/
+```
+
+2. Docker Setup
+
+```bash
+docker build -t wildfire-clf:latest .
+docker run -p 8000:8000 wildfire-clf
+```
+
+3. Kubernetes (Minikube Setup)
+
+```bash
+minikube start --driver=docker
+minikube docker-env | Invoke-Expression
+docker build -t wildfire-clf:latest .
+
+# apply deployment
+kubectl apply -f deployment.yaml
+kubectl apply -f service.yaml
+
+# expose service
+minikube tunnel # http://127.0.0.1:8000/
+```
+
+---
