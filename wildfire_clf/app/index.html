@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Wildfire AI Dashboard</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .dropzone {
+      display: block;
+      clear: both;
+      border: 2px dashed #38bdf8;
+      padding: 40px;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-top: 20px;
+      margin-bottom: 20px;
+    }
+
+    .dropzone.dragover {
+      background: #1e293b;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 30px;
+      border-collapse: collapse;
+      background: #111827;
+    }
+
+    th, td {
+      border: 1px solid #334155;
+      padding: 10px;
+    }
+
+    th {
+      background: #1e293b;
+    }
+
+    .preview {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .card {
+      background: #1e293b;
+      padding: 10px;
+      border-radius: 10px;
+    }
+
+    .card img {
+      width: 100%;
+      border-radius: 8px;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background: #38bdf8;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: auto;
+    }
+
+    .low {
+      color: #f87171; /* red */
+      font-weight: bold;
+    }
+
+    .good {
+      color: #4ade80; /* green */
+    }
+
+    .metrics-container {
+    display: flex;
+    justify-content: space-between; /* This spaces cards evenly across the row */
+    gap: 20px;
+    margin-top: 25px;
+    margin-bottom: 25px;
+    width: 100%;
+    clear: both;
+    }
+
+    .metric-card {
+    background: #151843;
+    padding: 20px;
+    border-radius: 12px;
+    flex: 1; /* This ensures all cards have the same width */
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    border-top: 4px solid #ff4d4d; /* Visual cue for fire theme */
+    min-width: 200px;
+    }
+
+    .metric-card h3 {
+        margin-top: 0;
+        font-size: 1.1rem;
+        color: #444;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 8px;
+    }
+
+    .metric-card p {
+        margin: 10px 0;
+        font-family: 'Courier New', Courier, monospace; /* Technical look for data */
+        font-size: 0.95rem;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>🔥 Wildfire AI Dashboard</h1>
+
+  <div id="metrics" style="margin-top:20px; display: flex; gap: 20px; flex-wrap: wrap;">
+    <div class="metric-card">
+        <p>Total Images: <span id="total">0</span></p>
+        <p>⏱ Latency: <span id="latency">0</span>s</p>
+    </div>
+    
+    <div class="metric-card">
+        <p><strong>Deltas (Shift Magnitude)</strong></p>
+        <p>Label Δ: <span id="deltaLabel">0</span> <small>(Fire freq shift)</small></p>
+        <p>Conf Δ: <span id="deltaConf">0</span> <small>(Certainty shift)</small></p>
+        <p>Stab Δ: <span id="deltaStab">0</span> <small>(Volatility shift)</small></p>
+    </div>
+
+    <div class="metric-card">
+        <p>Current Status: <span id="statusText">WAITING</span></p>
+        <p>🔥 Live Fire Ratio: <span id="fireRatio">0</span></p>
+        <p>📊 Live Avg Conf: <span id="avgConf">0</span></p>
+    </div>
+  </div>
+
+
+  <div id="dropzone" class="dropzone">
+    Drag & Drop Images or Click
+    <input type="file" id="fileInput" multiple hidden />
+  </div>
+
+  <div class="preview" id="preview"></div>
+
+  <button onclick="upload()">Run Inference</button>
+
+  <table>
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>ResNet</th>
+        <th>ResMLP</th>
+        <th>ViT</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="resultsTable"></tbody>
+  </table>
+  
+  <button onclick="downloadCSV()">Download CSV</button>
+
+</div>
+
+<script>
+
+let files = [];
+
+const dropzone = document.getElementById("dropzone");
+const fileInput = document.getElementById("fileInput");
+const preview = document.getElementById("preview");
+const table = document.getElementById("resultsTable");
+
+// open file picker
+dropzone.onclick = () => fileInput.click();
+
+// drag events
+dropzone.ondragover = e => {
+  e.preventDefault();
+  dropzone.classList.add("dragover");
+};
+
+dropzone.ondragleave = () => {
+  dropzone.classList.remove("dragover");
+};
+
+dropzone.ondrop = e => {
+  e.preventDefault();
+  dropzone.classList.remove("dragover");
+  handleFiles(e.dataTransfer.files);
+};
+
+fileInput.onchange = e => {
+  handleFiles(e.target.files);
+};
+
+function handleFiles(selected) {
+  files = [...selected];
+  preview.innerHTML = "";
+  table.innerHTML = "";
+
+  files.forEach(file => {
+    const reader = new FileReader();
+
+    reader.onload = e => {
+      preview.innerHTML += `
+        <div class="card">
+          <img src="${e.target.result}" />
+          <p>${file.name}</p>
+        </div>
+      `;
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+let lastResults = [];
+
+// upload
+async function upload() {
+  const formData = new FormData();
+
+  files.forEach(f => {
+    formData.append("files", f);
+  });
+
+  const res = await fetch("http://127.0.0.1:8000/predict", {
+    method: "POST",
+    body: formData
+  });
+
+  const data = await res.json();
+
+  lastResults = data.results;
+
+  document.getElementById("latency").innerText = data.latency_sec;
+
+  renderTable(data.results);
+  updateMetrics();
+}
+
+// render grouped table
+function renderTable(data) {
+  table.innerHTML = "";
+
+  for (const file in data) {
+
+    const m = data[file];
+
+    const resnet = m.resnet || {};
+    const resmlp = m.resmlp || {};
+    const vit = m.vit || {};
+
+    // handle missing safely
+    const r_prob = resnet.confidence ?? 0;
+    const rm_prob = resmlp.confidence ?? 0;
+    const v_prob = vit.confidence ?? 0;
+
+    const isLow = (r_prob < 0.6) || (rm_prob < 0.6) || (v_prob < 0.6);
+
+    table.innerHTML += `
+      <tr>
+        <td>${file}</td>
+
+        <td>
+          ${resnet.prediction || "-"}<br>
+          ${(r_prob * 100).toFixed(1)}%
+        </td>
+
+        <td>
+          ${resmlp.prediction || "-"}<br>
+          ${(rm_prob * 100).toFixed(1)}%
+        </td>
+
+        <td>
+          ${vit.prediction || "-"}<br>
+          ${(v_prob * 100).toFixed(1)}%
+        </td>
+
+        <td class="${isLow ? 'low' : 'good'}">
+          ${isLow ? "⚠️ Uncertain" : "✅ Confident"}
+        </td>
+      </tr>
+    `;
+  }
+}
+
+async function updateMetrics() {
+  try {
+    const res = await fetch("http://127.0.0.1:8000/metrics");
+    const data = await res.json();
+
+    if (data.deltas) {
+      // 1. Update the 3 Deltas
+      const dL = data.deltas.label_drift_delta;
+      const dC = data.deltas.confidence_drift_delta;
+      const dS = data.deltas.stability_drift_delta;
+
+      document.getElementById("deltaLabel").innerText = dL;
+      document.getElementById("deltaConf").innerText = dC;
+      document.getElementById("deltaStab").innerText = dS;
+
+      // 2. Update Status and Apply Color Coding
+      const statusEl = document.getElementById("statusText");
+      statusEl.innerText = data.status;
+      statusEl.style.color = data.status === "CRITICAL" ? "#ff4d4d" : "#2ecc71";
+      statusEl.style.fontWeight = "bold";
+
+      // Highlight specific deltas if they are high (approaching 1)
+      document.getElementById("deltaLabel").style.color = dL > 0.4 ? "red" : "green";
+      document.getElementById("deltaConf").style.color = dC > 0.3 ? "red" : "green";
+
+      // 3. Update Raw Live Metrics
+      document.getElementById("total").innerText = data.raw_counts.total_processed || 0;
+      document.getElementById("fireRatio").innerText = (data.raw_counts.window_fire_ratio * 100).toFixed(1) + "%";
+      document.getElementById("avgConf").innerText = (data.raw_counts.window_avg_conf * 100).toFixed(1) + "%";
+    }
+  } catch (error) {
+    console.error("Failed to fetch metrics:", error);
+  }
+}
+
+async function downloadCSV() {
+
+  const formData = new FormData();
+  files.forEach(f => formData.append("files", f));
+
+  const res = await fetch("http://127.0.0.1:8000/predict_csv", {
+    method: "POST",
+    body: formData
+  });
+
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "results.csv";
+  a.click();
+}
+
+</script>
+
+</body>
+</html>
